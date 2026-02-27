@@ -1,93 +1,88 @@
-import sqlite3
-import sys
+import arcade
 
-from PyQt6 import uic
-from PyQt6.QtWidgets import QApplication, QMainWindow, QTableWidgetItem
-
-
-class MyWidget(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        uic.loadUi("UI.ui", self)
-
-        # название файла и таблица под твой проект
-        self.con = sqlite3.connect("coffe_db.sqlite")
-
-        self.pushButton.clicked.connect(self.update_result)
-        self.tableWidget.itemChanged.connect(self.item_changed)
-        self.pushButton_2.clicked.connect(self.save_results)
-
-        self.modified = {}
-        self.titles = None
-
-    def update_result(self):
-        try:
-            cur = self.con.cursor()
-            item_id = self.spinBox.value()  # ID из спинбокса (целое)
-            result = cur.execute(
-                "SELECT ID, sort, roast_level, is_ground, taste, volume, price "
-                "FROM coffee WHERE ID = ?",
-                (item_id,)
-            ).fetchall()
-        except Exception as e:
-            print("DB error:", e)
-            self.statusBar().showMessage(f"Ошибка БД: {e}")
-            return
-
-        self.tableWidget.blockSignals(True)
-
-        self.tableWidget.setRowCount(len(result))
-        if not result:
-            self.statusBar().showMessage(f"Ничего не нашлось для ID = {item_id}")
-            self.tableWidget.blockSignals(False)
-            return
-        else:
-            self.statusBar().showMessage(f"Нашлась запись с ID = {item_id}")
-
-        self.tableWidget.setColumnCount(7)
-        self.titles = ["ID", "sort", "roast_level", "is_ground", "taste", "volume", "price"]
-
-        # заголовки (если нужно)
-        self.tableWidget.setHorizontalHeaderLabels(self.titles)
-
-        for i, row in enumerate(result):
-            for j, val in enumerate(row):
-                self.tableWidget.setItem(i, j, QTableWidgetItem(str(val)))
-
-        self.tableWidget.blockSignals(False)
-        self.modified = {}
-
-    def item_changed(self, item):
-        if not self.titles:
-            return
-        col = item.column()
-        if 0 <= col < len(self.titles):
-            col_name = self.titles[col]
-            self.modified[col_name] = item.text()
-
-    def save_results(self):
-        if not self.modified:
-            return
-
-        cur = self.con.cursor()
-        set_part = ", ".join([f"{key} = ?" for key in self.modified.keys()])
-        que = f"UPDATE coffee SET {set_part} WHERE ID = ?"
-
-        params = list(self.modified.values())
-        params.append(self.spinBox.value())
-
-        try:
-            cur.execute(que, params)
-            self.con.commit()
-            self.statusBar().showMessage("Изменения сохранены")
-            self.modified.clear()
-        except Exception as e:
-            print("DB save error:", e)
-            self.statusBar().showMessage(f"Ошибка сохранения: {e}")
+SPEED = 4
+SCREEN_WIDTH = 960
+SCREEN_HEIGHT = 640
+SCREEN_TITLE = "Leonardo Game"
 
 
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    ex = MyWidget()
-    ex.show()
-    sys.exit(app.exec())
+class GridGame(arcade.Window):
+    def __init__(self, width, height, title):
+        super().__init__(width, height, title)
+        self.cell_size = 64
+        self.all_sprites = arcade.SpriteList()
+        self.wall_sprites = arcade.SpriteList()
+        # Загружаем текстуры из встроенных ресурсов
+        self.stone_texture = arcade.load_texture(":resources:images/tiles/stoneCenter.png")
+        self.sand_texture = arcade.load_texture(":resources:images/tiles/sandCenter.png")
+        self.player_texture = arcade.load_texture(":resources:images/enemies/slimeBlue.png")
+
+    def setup(self):
+        self.grid = [[0 for _ in range(15)] for _ in range(10)]
+        for row in range(10):
+            for col in range(15):
+                if not row * col or row == 9 or col == 14:
+                    self.grid[row][col] = 1
+                x = col * self.cell_size + self.cell_size // 2
+                y = row * self.cell_size + self.cell_size // 2
+
+                # Рисуем основу клетки
+                if self.grid[row][col] == 0:
+                    sand_sprite = arcade.Sprite(self.sand_texture, scale=0.5)
+                    sand_sprite.position = (x, y)
+                    self.grid[row][col] = [sand_sprite]
+                    self.all_sprites.append(sand_sprite)
+                else:
+                    stone_sprite = arcade.Sprite(self.stone_texture, scale=0.5)
+                    self.grid[row][col] = [stone_sprite]
+                    stone_sprite.position = (x, y)
+                    self.wall_sprites.append(stone_sprite)
+                    self.all_sprites.append(stone_sprite)
+
+        self.player = arcade.Sprite(self.player_texture, scale=0.5)
+        x = 7 * self.cell_size + self.cell_size // 2
+        y = 5 * self.cell_size + self.cell_size // 2
+        self.player.position = (x, y)
+        self.all_sprites.append(self.player)
+
+        self.physics_engine = arcade.PhysicsEngineSimple(
+            self.player, self.wall_sprites
+        )
+
+    def on_draw(self):
+        self.clear()
+        self.all_sprites.draw()
+
+    def on_update(self, delta_time: float):
+        self.physics_engine.update()
+
+    def on_key_press(self, key, modifiers):
+        if key == arcade.key.UP:
+            self.player.change_y = SPEED
+        elif key == arcade.key.DOWN:
+            self.player.change_y = -SPEED
+        elif key == arcade.key.LEFT:
+            self.player.change_x = -SPEED
+        elif key == arcade.key.RIGHT:
+            self.player.change_x = SPEED
+
+    def on_key_release(self, key, modifiers):
+        if key in [arcade.key.UP, arcade.key.DOWN]:
+            self.player.change_y = 0
+        if key in [arcade.key.LEFT, arcade.key.RIGHT]:
+            self.player.change_x = 0
+
+
+def setup_game(width=960, height=640, title="Leonardo Game"):
+    game = GridGame(width, height, title)
+    game.setup()
+    return game
+
+
+def main():
+    setup_game(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+    arcade.run()
+
+
+if __name__ == "__main__":
+    main()

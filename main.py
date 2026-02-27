@@ -3,10 +3,9 @@ from flask import *
 app = Flask(__name__)
 
 @app.route('/')
-@app.route('/index')
+@app.route('/promotion_image')
 def index():
-    user = 'ahha'
-    return render_template('index.html', user=user)
+    return render_template('promotion_image.html')
 
 @app.route('/odd_even')
 def odd_even():

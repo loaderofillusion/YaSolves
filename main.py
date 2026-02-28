@@ -7,6 +7,10 @@ app.secret_key = 'supersecretkey'
 def index():
     return render_template('promotion_image.html')
 
+@app.route('/choice/<planet_name>')
+def choice(planet_name):
+    return render_template('choices.html', planet_name=planet_name)
+
 @app.route('/astronaut_selection', methods=['POST', 'GET'])
 def selection():
     form_data = {}

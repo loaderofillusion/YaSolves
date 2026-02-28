@@ -7,6 +7,10 @@ app.secret_key = 'supersecretkey'
 def index():
     return render_template('promotion_image.html')
 
+@app.route('/results/<string:nickname>/<int:step>/<float:result>')
+def results(nickname, step, result):
+    return render_template('results.html', nickname=nickname, step=step, result=result)
+
 @app.route('/choice/<planet_name>')
 def choice(planet_name):
     return render_template('choices.html', planet_name=planet_name)
